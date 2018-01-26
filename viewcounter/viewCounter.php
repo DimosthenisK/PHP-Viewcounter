@@ -17,8 +17,7 @@ function logD($message) {
 
 if (isset($_GET['job'])) {
     if ($_GET['job'] == "addView") {
-        logD("inAddView");
-        if ($stmt = $mysqli->prepare("SELECT ip FROM views")) {
+        if ($stmt = $mysqli->prepare("SELECT ip FROM views WHERE valid = 1")) {
             $stmt->execute();
             $stmt->bind_result($db_ip);
 
@@ -37,13 +36,61 @@ if (isset($_GET['job'])) {
                 if ($stmt = $mysqli-> prepare("INSERT INTO views (ip) VALUES (?)")) {
                     $stmt->bind_param("s", $_SERVER['REMOTE_ADDR']);
                     $stmt->execute();
-                    logD("ftasame");
                     $stmt->close();
                 }
                 else {
                     throw new Exception("Error in inserting view - " . $mysqli->connect_error);
                 }
             }
+        }
+        else {
+            throw new Exception("Error in getting views - " . $mysqli->connect_error);
+        }
+    }
+    else if ($_GET['job'] == "cleanViews") {
+        if ($stmt = $mysqli->prepare("SELECT * FROM views WHERE valid = 1")) {
+            $stmt->execute();
+            $stmt->bind_result($ip, $timestamp, $valid);
+            $ipsToBeCleaned = array();
+
+            $found = false;
+            while ($stmt->fetch()) {
+                if (time() - $timestamp > EXPIRATION) {
+                    array_push($ipsToBeCleaned, $ip);
+                }
+            }
+            $stmt->close();
+
+
+            if (!empty($ipsToBeCleaned)) {
+                foreach ($ipsToBeCleaned as $ip) {
+                    $stmt->prepare("UPDATE views SET valid = 1 WHERE ip = ?");
+                    $stmt->bind_param("s", $ip);
+                    $stmt->execute();
+                }
+            }
+
+            echo("Cleaned.");
+
+            $stmt->close();
+        }
+        else {
+            throw new Exception("Error in getting views - " . $mysqli->connect_error);
+        }
+    }
+    else if ($_GET['job'] == "getViews") {
+        if ($stmt = $mysqli->prepare("SELECT ip FROM views WHERE valid = 1")) {
+            $stmt->execute();
+            $stmt->bind_result($ip);
+
+            $viewCounter = 0;
+            while($stmt->fetch()) {
+                $viewCounter++;
+            }
+
+            echo $viewCounter;
+
+            $stmt->close();
         }
         else {
             throw new Exception("Error in getting views - " . $mysqli->connect_error);
